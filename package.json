@@ -1,0 +1,8 @@
+{
+  "name": "projectarche",
+  "version": "1.0.0",
+  "description": "Simple YouTube video player",
+  "scripts": {
+    "test": "echo \"No test specified\" && exit 0"
+  }
+}
