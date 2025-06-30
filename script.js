@@ -1,16 +1,33 @@
 // JavaScript for YouTube player with scrolling transcript
 let player;
 let transcriptTimer;
+let currentVideoId;
 
-// Example transcript data with word-level timing
-const exampleTranscript = [
-  { start: 0.0, end: 0.5, text: 'Hello' },
-  { start: 0.5, end: 1.2, text: 'world' },
-  { start: 1.2, end: 1.8, text: 'this' },
-  { start: 1.8, end: 2.2, text: 'is' },
-  { start: 2.2, end: 2.8, text: 'a' },
-  { start: 2.8, end: 3.5, text: 'test.' }
-];
+// Attempt to fetch timedtext captions from YouTube
+async function fetchTranscript(videoId, lang = 'en') {
+  const url =
+    'https://cors.isomorphic-git.org/https://video.google.com/timedtext?lang=' +
+    encodeURIComponent(lang) +
+    '&v=' +
+    encodeURIComponent(videoId);
+  const resp = await fetch(url);
+  if (!resp.ok) {
+    throw new Error('Failed to fetch transcript');
+  }
+  const xml = await resp.text();
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'text/xml');
+  const texts = Array.from(doc.getElementsByTagName('text'));
+  return texts.map((node) => {
+    const start = parseFloat(node.getAttribute('start')) || 0;
+    const dur = parseFloat(node.getAttribute('dur')) || 0;
+    return {
+      start,
+      end: start + dur,
+      text: node.textContent.trim(),
+    };
+  });
+}
 
 function extractVideoID(url) {
   const regex = /(?:v=|\/embed\/|\.be\/)([\w-]{11})/;
@@ -55,8 +72,14 @@ function startTranscriptSync() {
   transcriptTimer = setInterval(updateTranscriptHighlight, 100);
 }
 
-function onPlayerReady() {
-  renderTranscript(exampleTranscript);
+async function onPlayerReady() {
+  try {
+    const transcript = await fetchTranscript(currentVideoId);
+    renderTranscript(transcript);
+  } catch (e) {
+    console.error('Transcript error', e);
+    renderTranscript([]);
+  }
   startTranscriptSync();
 }
 
@@ -64,6 +87,7 @@ function loadVideo() {
   const url = document.getElementById('videoURL').value.trim();
   const videoId = extractVideoID(url);
   if (videoId) {
+    currentVideoId = videoId;
     if (player) {
       player.loadVideoById(videoId);
     } else {
